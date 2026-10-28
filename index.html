@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ThermalMind</title>
+<style>
+:root{--bg:#f5f6f8;--card:#fff;--line:#e3e6ea;--ink:#14181f;--mut:#667085;--ok:#047857;--okbg:#e7f6ef;--bad:#b42318;--badbg:#fdeceb;--accent:#14181f}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 "Segoe UI",system-ui,-apple-system,Roboto,sans-serif}
+main{max-width:1180px;margin:0 auto;padding:28px 20px 48px}
+header{display:flex;align-items:center;gap:14px;margin-bottom:20px}
+.logo{width:40px;height:40px;border-radius:10px;background:var(--accent);color:#fff;display:grid;place-items:center;font-weight:700}
+h1{font-size:20px;margin:0}h2{font-size:15px;margin:0 0 12px}
+.sub{color:var(--mut);font-size:13px}
+.badge{margin-left:auto;padding:4px 12px;border-radius:999px;font-size:13px;background:var(--okbg);color:var(--ok)}
+.badge.bad{background:var(--badbg);color:var(--bad)}
+.banner{display:none;background:var(--badbg);color:var(--bad);border:1px solid #f4c7c3;border-radius:10px;padding:10px 14px;margin-bottom:16px}
+.banner button{margin-left:8px}
+.grid{display:grid;gap:16px}
+.stats{grid-template-columns:repeat(4,1fr);margin-bottom:16px}
+.two{grid-template-columns:1fr 1fr;margin-bottom:16px}
+@media(max-width:860px){.stats,.two{grid-template-columns:1fr 1fr}}
+@media(max-width:560px){.stats,.two{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;min-width:0}
+.stat b{display:block;font-size:20px;margin:2px 0;overflow-wrap:anywhere}
+.stat .l{color:var(--mut);font-size:13px}
+.stat small{color:var(--mut)}
+input,select,button{font:inherit}
+input,select{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:#fff}
+button{padding:9px 16px;border:0;border-radius:8px;background:var(--accent);color:#fff;font-weight:600;cursor:pointer}
+button.ghost{background:#fff;color:var(--ink);border:1px solid var(--line)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,input:focus-visible,select:focus-visible,.repo:focus-visible{outline:2px solid #2563eb;outline-offset:2px}
+.row{display:flex;gap:8px;margin-bottom:10px}
+.repos{max-height:170px;overflow:auto;border:1px solid var(--line);border-radius:8px;margin-bottom:10px}
+.repo{padding:7px 11px;cursor:pointer;display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid var(--line)}
+.repo:last-child{border-bottom:0}.repo:hover{background:#f3f4f6}.repo.sel{background:#e8eefc}
+.repo span:last-child{color:var(--mut);white-space:nowrap}
+.bar{height:8px;background:#eceff3;border-radius:99px;overflow:hidden;margin:10px 0 4px}
+.bar i{display:block;height:100%;width:0;background:var(--ok);transition:width .4s}
+.err{color:var(--bad);margin:6px 0;overflow-wrap:anywhere}
+.info{background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:10px 0;font-size:13px;overflow-wrap:anywhere}
+.log{height:190px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:10px;background:#fcfcfd}
+.log p{margin:0 0 8px;white-space:pre-wrap;overflow-wrap:anywhere}
+.log .u{color:#1d4ed8}.log .m{color:var(--mut);font-size:12px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line)}
+th{color:var(--mut);font-weight:600}
+.scroll{overflow-x:auto}
+.mut{color:var(--mut)}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <div class="logo">TM</div>
+  <div><h1>ThermalMind</h1><div class="sub">Deploy open models to your own AWS account and watch the host</div></div>
+  <span id="region" class="badge bad">Checking AWS</span>
+</header>
+
+<div id="banner" class="banner"><span id="bannerText"></span><button class="ghost" onclick="loadSystem(1)">Check again</button></div>
+
+<section class="grid stats">
+  <div class="card stat"><span class="l">Loaded model</span><b id="sModel">None</b><small id="sModelSub">Deploy a model to begin</small></div>
+  <div class="card stat"><span class="l">CPU / RAM</span><b id="sHost">-</b><small id="sHostSub"></small></div>
+  <div class="card stat"><span class="l">Last inference</span><b id="sLat">-</b><small id="sLatSub">No requests yet</small></div>
+  <div class="card stat"><span class="l">S3 model store</span><b id="sBucket" style="font-size:14px">-</b><small id="sBucketSub"></small></div>
+</section>
+
+<section class="grid two">
+  <div class="card">
+    <h2>Deploy a model from Hugging Face</h2>
+    <div class="row"><input id="q" placeholder="Search GGUF models, e.g. qwen2.5 0.5b instruct" aria-label="Search models"><button onclick="search()">Search</button></div>
+    <div id="repos" class="repos" hidden></div>
+    <div class="row"><select id="files" aria-label="Model file" disabled><option>Pick a model first</option></select><button id="deployBtn" onclick="deploy()" disabled>Deploy</button></div>
+    <div class="sub" id="fileHint"></div>
+    <div class="bar"><i id="bar"></i></div>
+    <div class="sub" id="stage">Idle</div>
+    <div class="err" id="err"></div>
+    <div class="info" id="info" hidden></div>
+    <h2 style="margin-top:14px">Chat with the deployed model</h2>
+    <div class="log" id="log"><p class="m">Deploy a model, then send a prompt.</p></div>
+    <div class="row"><input id="msg" placeholder="Type a prompt" aria-label="Prompt"><button id="sendBtn" onclick="send()">Send</button></div>
+  </div>
+
+  <div class="grid" style="align-content:start">
+    <div class="card">
+      <h2>Ask the supervisor</h2>
+      <div class="sub" style="margin-bottom:8px">Answers from live host telemetry, using the loaded model.</div>
+      <div class="log" id="sLog"><p class="m">Ask about CPU, memory or the deployment.</p></div>
+      <div class="row"><input id="ask" placeholder="e.g. Is there headroom for a bigger model?" aria-label="Question"><button onclick="ask()">Ask</button></div>
+    </div>
+    <div class="card">
+      <h2>Models stored in S3</h2>
+      <div id="lib" class="sub">Loading</div>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Live telemetry</h2>
+  <div class="scroll"><table><thead><tr><th>Time</th><th>Model</th><th>CPU</th><th>RAM</th><th>Latency</th><th>Tokens/s</th><th>Temp</th></tr></thead><tbody id="tel"></tbody></table></div>
+  <div class="sub" style="margin-top:8px" id="tempNote"></div>
+</section>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+const gb=b=>(b/1e9).toFixed(2)+' GB', mb=b=>b>=1e9?gb(b):Math.round(b/1e6)+' MB';
+async function api(p,o){const r=await fetch(p,o);const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.detail||r.statusText);return j}
+const post=(p,b)=>api(p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
+function add(logId,cls,text){const l=$(logId),p=document.createElement('p');p.className=cls;p.textContent=text;l.appendChild(p);l.scrollTop=l.scrollHeight;return p}
+
+async function loadSystem(refresh){
+  try{
+    const s=await api('/api/system'+(refresh?'?refresh=1':''));
+    const ok=s.aws.ok;
+    $('region').textContent=ok?s.aws.region+' connected':'AWS not ready';
+    $('region').className='badge'+(ok?'':' bad');
+    $('banner').style.display=ok&&s.llama?'none':'block';
+    $('bannerText').textContent=!ok?s.aws.message:'llama-cpp-python is not installed on the server, so models cannot be loaded.';
+    $('sBucket').textContent=ok?s.aws.bucket:'Unavailable';
+    $('sBucketSub').textContent=ok?'Created automatically in '+s.aws.region:s.aws.message;
+    loadLibrary();
+  }catch(e){$('banner').style.display='block';$('bannerText').textContent=e.message}
+}
+
+async function search(){
+  const q=$('q').value.trim(); if(!q)return;
+  const box=$('repos'); box.hidden=false; box.textContent='Searching';
+  try{
+    const res=await api('/api/hf/search?q='+encodeURIComponent(q));
+    box.textContent='';
+    if(!res.length){box.textContent='No GGUF models found. Try another search.';return}
+    res.forEach(m=>{
+      const d=document.createElement('div');d.className='repo';d.tabIndex=0;
+      d.innerHTML='<span></span><span></span>';
+      d.children[0].textContent=m.id; d.children[1].textContent=m.downloads.toLocaleString()+' downloads';
+      d.onclick=()=>pick(m.id,d); d.onkeydown=e=>{if(e.key==='Enter')pick(m.id,d)};
+      box.appendChild(d);
+    });
+  }catch(e){box.textContent=e.message}
+}
+
+let repo=null;
+async function pick(id,el){
+  repo=id; document.querySelectorAll('.repo').forEach(x=>x.classList.remove('sel')); el.classList.add('sel');
+  const sel=$('files'); sel.disabled=true; sel.innerHTML='<option>Loading files</option>'; $('deployBtn').disabled=true;
+  try{
+    const r=await api('/api/hf/files?repo='+encodeURIComponent(id));
+    sel.innerHTML='';
+    r.files.forEach(f=>{
+      const o=document.createElement('option'); o.value=f.filename;
+      o.textContent=f.filename+' ('+mb(f.size)+(f.fits?'':', too large for this host')+')';
+      o.disabled=!f.fits; if(f.filename===r.recommended)o.selected=true; sel.appendChild(o);
+    });
+    sel.disabled=false; $('deployBtn').disabled=!r.recommended;
+    $('fileHint').textContent=r.recommended?'Recommended file preselected. About '+mb(r.ram_budget)+' of RAM is usable.':'No file in this repo fits in about '+mb(r.ram_budget)+' of RAM. Try a smaller model.';
+  }catch(e){sel.innerHTML='<option>'+e.message+'</option>'}
+}
+
+async function deploy(){
+  $('err').textContent='';
+  try{await post('/api/deploy',{repo,filename:$('files').value});poll()}
+  catch(e){$('err').textContent=e.message}
+}
+
+async function poll(){
+  try{
+    const s=await api('/api/deploy/status');
+    $('bar').style.width=s.progress+'%'; $('stage').textContent=s.stage; $('err').textContent=s.error||'';
+    const busy=s.status==='deploying'; $('deployBtn').disabled=busy||!repo;
+    if(s.model){
+      const m=s.model;
+      $('sModel').textContent=m.name; $('sModelSub').textContent=m.quant+' | '+m.size_mb+' MB';
+      $('info').hidden=false;
+      $('info').textContent='Repo: '+m.repo+'\nFile: '+m.file+'\nStored at: '+m.s3_uri+'\nLoaded: '+m.loaded_at;
+      $('info').style.whiteSpace='pre-line';
+    }
+    if(busy||s.status==='ready')loadLibrary();
+  }catch(e){}
+}
+
+async function send(){
+  const t=$('msg').value.trim(); if(!t)return; $('msg').value='';
+  add('log','u','You: '+t); const w=add('log','m','Thinking');
+  try{const r=await post('/api/chat',{message:t}); w.remove(); add('log','',r.reply); add('log','m',r.latency_ms+' ms'+(r.tok_s?' | '+r.tok_s+' tokens/s':''))}
+  catch(e){w.textContent=e.message}
+}
+async function ask(){
+  const t=$('ask').value.trim(); if(!t)return; $('ask').value='';
+  add('sLog','u','You: '+t); const w=add('sLog','m','Thinking');
+  try{const r=await post('/api/supervisor',{query:t}); w.remove(); add('sLog','',r.response)}
+  catch(e){w.textContent=e.message}
+}
+$('msg').onkeydown=e=>{if(e.key==='Enter')send()};
+$('ask').onkeydown=e=>{if(e.key==='Enter')ask()};
+$('q').onkeydown=e=>{if(e.key==='Enter')search()};
+
+async function loadLibrary(){
+  try{
+    const r=await api('/api/models'); const el=$('lib');
+    if(!r.bucket){el.textContent=r.message||'S3 is not ready.';return}
+    if(!r.items.length){el.textContent='Nothing stored yet in '+r.bucket+'. Deployed models appear here.';return}
+    el.textContent=''; const t=document.createElement('table');
+    r.items.forEach(i=>{const tr=t.insertRow();tr.insertCell().textContent=i.key.replace(/^models\//,'');tr.insertCell().textContent=mb(i.size);tr.insertCell().textContent=i.modified});
+    el.appendChild(t);
+  }catch(e){$('lib').textContent=e.message}
+}
+
+async function telemetry(){
+  try{
+    const t=await api('/api/telemetry'), n=t.now;
+    $('sHost').textContent=n.cpu+'% / '+n.mem+'%';
+    $('sHostSub').textContent=n.used_gb+' of '+n.total_gb+' GB in use'+(n.temp_c!=null?' | '+n.temp_c+' C':'');
+    $('sLat').textContent=n.latency_ms!=null?n.latency_ms+' ms':'-';
+    $('sLatSub').textContent=n.tok_s!=null?n.tok_s+' tokens/s':'No requests yet';
+    const tb=$('tel'); tb.textContent='';
+    t.history.slice().reverse().forEach(h=>{
+      const tr=tb.insertRow();
+      [h.t,h.model||'none',h.cpu+'%',h.mem+'%',h.latency_ms!=null?h.latency_ms+' ms':'-',h.tok_s??'-',h.temp_c!=null?h.temp_c+' C':'n/a'].forEach(v=>tr.insertCell().textContent=v);
+    });
+    $('tempNote').textContent=n.temp_c==null?'EC2 instances expose no temperature sensor, so temperature shows only where the host reports one.':'';
+  }catch(e){}
+}
+
+loadSystem(0); poll(); telemetry();
+setInterval(telemetry,3000); setInterval(poll,2000);
+</script>
+</body>
+</html>
